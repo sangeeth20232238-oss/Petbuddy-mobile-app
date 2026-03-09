@@ -118,4 +118,4 @@ const styles = StyleSheet.create({
     skipBtn: { color: '#999', marginTop: 30, fontFamily: 'Fredoka-SemiBold', textDecorationLine: 'underline' },
     qBox: { flexDirection: 'row', width: '100%', padding: 15, backgroundColor: '#F9F9F9', borderRadius: 12, marginTop: 15, alignItems: 'center', justifyContent: 'space-between' },
     qText: { color: '#444' }
-});d
+});
