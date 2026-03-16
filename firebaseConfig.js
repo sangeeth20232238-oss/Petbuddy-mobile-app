@@ -1,8 +1,9 @@
 import { initializeApp } from "firebase/app";
 import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore"; // 1. MUST IMPORT THIS
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 
- const firebaseConfig = {
+const firebaseConfig = {
     apiKey: "AIzaSyDkR3kv_5rsUrUKa9qJdU61ci7IZnczDgA",
     authDomain: "petbuddy-fd1d8.firebaseapp.com",
     projectId: "petbuddy-fd1d8",
@@ -10,11 +11,16 @@ import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
     messagingSenderId: "714854625893",
     appId: "1:714854625893:web:e44de7620a31400345cc8c",
     measurementId: "G-8GWMPREPJ2"
-  };
+};
 
 const app = initializeApp(firebaseConfig);
+
+// 2. INITIALIZE FIRESTORE
+const db = getFirestore(app); 
+
 const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage)
 });
 
-export { auth };
+// 3. EXPORT BOTH DB AND AUTH
+export { auth, db };

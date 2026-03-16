@@ -26,6 +26,9 @@ import PetBuddyConfigScreen from './src/features/pet-buddy/PetBuddyConfigScreen'
 import PetBuddyTrackingScreen from './src/features/pet-buddy/PetBuddyTrackingScreen';
 import VolunteerOnboardingScreen from './src/features/pet-buddy/VolunteerOnboardingScreen';
 
+// Profile 
+import EditProfileScreen from './src/features/profile/EditProfileScreen';
+
 SplashScreen.preventAutoHideAsync();
 const Stack = createStackNavigator();
 
@@ -63,7 +66,10 @@ export default function App() {
         <Stack.Screen name="PetBuddyConfig" component={PetBuddyConfigScreen} />
         <Stack.Screen name="PetBuddyTracking" component={PetBuddyTrackingScreen} />
         <Stack.Screen name="VolunteerOnboarding" component={VolunteerOnboardingScreen} />
-        
+
+        {/* Profile */}
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

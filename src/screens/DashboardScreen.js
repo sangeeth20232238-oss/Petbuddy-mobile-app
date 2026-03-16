@@ -1,13 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, Image, TouchableOpacity, Dimensions, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { db, auth } from '../../firebaseConfig'; 
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
 export default function DashboardScreen({ navigation }) {
     const [isSidebarVisible, setSidebarVisible] = useState(false);
+    const [userData, setUserData] = useState({ 
+        name: 'User', 
+        profilePic: 'https://via.placeholder.com/150' 
+    });
+
+    // Real-time listener for the logged-in user
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (user) {
+            const userRef = doc(db, "users", user.uid);
+            const unsubscribe = onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserData({
+                        name: docSnap.data().name || "User",
+                        profilePic: docSnap.data().profilePic || 'https://via.placeholder.com/150'
+                    });
+                }
+            }, (error) => {
+                console.error("Firestore Listener Error:", error);
+            });
+            return unsubscribe; // Cleanup on unmount
+        }
+    }, []);
 
     const services = [
         { id: 1, name: 'Emergency Vet', icon: 'alert-decagram-outline', color: '#FF4D4D' },
@@ -23,23 +48,19 @@ export default function DashboardScreen({ navigation }) {
             <LinearGradient colors={['#FFF5F0', '#FFFFFF']} style={styles.background} />
             
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-                {/* Updated Header with Notification Bell */}
+                {/* Header: Dynamic Profile & Notification Bell */}
                 <View style={styles.header}>
                     <View style={styles.userInfo}>
                         <TouchableOpacity onPress={() => setSidebarVisible(true)}>
-                            <Image source={{ uri: 'https://i.pravatar.cc/150?u=enoch' }} style={styles.profilePic} />
+                            <Image source={{ uri: userData.profilePic }} style={styles.profilePic} />
                         </TouchableOpacity>
                         <View>
-                            <Text style={[styles.greeting, { fontFamily: 'Fredoka-SemiBold' }]}>Hello, Enoch</Text>
+                            <Text style={[styles.greeting, { fontFamily: 'Fredoka-SemiBold' }]}>Hello, {userData.name}</Text>
                             <Text style={[styles.subGreeting, { fontFamily: 'Fredoka-Bold' }]}>Good Morning!</Text>
                         </View>
                     </View>
                     
-                    {/* The Bell Icon */}
-                    <TouchableOpacity 
-                        style={styles.notificationBtn} 
-                        onPress={() => Alert.alert("Notifications", "You have no new pet updates at the moment.")}
-                    >
+                    <TouchableOpacity style={styles.notificationBtn} onPress={() => Alert.alert("Notifications", "No new updates.")}>
                         <MaterialCommunityIcons name="bell-outline" size={28} color="#FF741C" />
                         <View style={styles.notificationBadge} />
                     </TouchableOpacity>
@@ -63,20 +84,23 @@ export default function DashboardScreen({ navigation }) {
             {/* AI Assistant FAB */}
             <TouchableOpacity 
                 style={styles.fab} 
-                onPress={() => Alert.alert("PetBot AI", "I am your AI assistant. Need help finding a Buddy or a Vet?")}
+                onPress={() => Alert.alert("PetBot AI", "How can I help you and your pet today?")}
             >
                 <MaterialCommunityIcons name="robot-happy-outline" size={38} color="white" />
             </TouchableOpacity>
 
-            {/* Sidebar Modal */}
-            <Modal transparent={true} visible={isSidebarVisible} animationType="none">
+            {/* Dynamic Sidebar Modal */}
+            <Modal transparent={true} visible={isSidebarVisible} animationType="fade">
                 <View style={styles.modalOverlay}>
                     <TouchableOpacity style={styles.closeArea} onPress={() => setSidebarVisible(false)} />
                     <View style={styles.sidebar}>
                         <View style={styles.sidebarProfile}>
-                            <Image source={{ uri: 'https://i.pravatar.cc/150?u=enoch' }} style={styles.largeProfilePic} />
-                            <Text style={styles.userName}>Enoch</Text>
-                            <TouchableOpacity onPress={() => Alert.alert("Profile", "Edit screen coming soon")}>
+                            <Image source={{ uri: userData.profilePic }} style={styles.largeProfilePic} />
+                            <Text style={styles.userName}>{userData.name}</Text>
+                            <TouchableOpacity onPress={() => {
+                                setSidebarVisible(false);
+                                navigation.navigate('EditProfile'); // Navigates to the new edit screen
+                            }}>
                                 <Text style={styles.editBtn}>Edit Profile</Text>
                             </TouchableOpacity>
                         </View>
@@ -100,7 +124,7 @@ export default function DashboardScreen({ navigation }) {
 }
 
 const MenuLink = ({ icon, label }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert(label, "Feature loading...")}>
+    <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert(label, "Loading...")}>
         <MaterialCommunityIcons name={icon} size={24} color="#555" />
         <Text style={styles.menuLabel}>{label}</Text>
     </TouchableOpacity>
@@ -109,7 +133,6 @@ const MenuLink = ({ icon, label }) => (
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFF' },
     background: { ...StyleSheet.absoluteFillObject },
-    // Header styling adjusted for spacing between Profile and Bell
     header: { flexDirection: 'row', padding: 25, alignItems: 'center', justifyContent: 'space-between' },
     userInfo: { flexDirection: 'row', alignItems: 'center' },
     profilePic: { width: 55, height: 55, borderRadius: 27.5, marginRight: 15, borderWidth: 2, borderColor: '#FF741C' },
