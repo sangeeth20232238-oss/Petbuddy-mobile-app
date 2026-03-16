@@ -1,68 +1,108 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Image, TextInput, Alert, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { db, auth } from '../../../firebaseConfig';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth, db, storage } from '../../../firebaseConfig'; 
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const { width } = Dimensions.get('window');
 
 export default function EditProfileScreen({ navigation }) {
     const [name, setName] = useState('');
     const [image, setImage] = useState(null);
+    const [uploading, setUploading] = useState(false);
     const user = auth.currentUser;
 
     useEffect(() => {
         if (user) {
-            const fetchUser = async () => {
+            const fetchProfile = async () => {
                 const docSnap = await getDoc(doc(db, "users", user.uid));
                 if (docSnap.exists()) {
-                    setName(docSnap.data().name);
-                    setImage(docSnap.data().profilePic);
+                    setName(docSnap.data().name || "");
+                    setImage(docSnap.data().profilePic || null);
                 }
             };
-            fetchUser();
+            fetchProfile();
         }
     }, []);
 
+    // Helper to convert URI to Blob for Firebase Storage
+    const uploadImageAsync = async (uri) => {
+        const blob = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.onload = function () { resolve(xhr.response); };
+            xhr.onerror = function (e) { reject(new TypeError("Network request failed")); };
+            xhr.responseType = "blob";
+            xhr.open("GET", uri, true);
+            xhr.send(null);
+        });
+
+        const fileRef = ref(storage, `profiles/${user.uid}`);
+        await uploadBytes(fileRef, blob);
+        blob.close(); // Important for memory management
+        return await getDownloadURL(fileRef);
+    };
+
     const handleSave = async () => {
+        if (!name) return Alert.alert("Error", "Name is required.");
+        setUploading(true);
+
         try {
-            await updateDoc(doc(db, "users", user.uid), {
+            let finalImageUrl = image;
+
+            // Only upload if it's a new local URI (starts with 'file' or 'content')
+            if (image && !image.startsWith('http')) {
+                finalImageUrl = await uploadImageAsync(image);
+            }
+
+            await setDoc(doc(db, "users", user.uid), {
                 name: name,
-                profilePic: image
-            });
-            Alert.alert("Success", "Profile updated for the app!");
-            navigation.goBack();
+                profilePic: finalImageUrl,
+                lastUpdate: new Date().toISOString()
+            }, { merge: true });
+
+            setUploading(false);
+            Alert.alert("Success", "Profile updated online!", [
+                { text: "OK", onPress: () => navigation.navigate('Dashboard') }
+            ]);
         } catch (error) {
-            Alert.alert("Error", "Could not save profile.");
+            setUploading(false);
+            Alert.alert("Upload Error", error.message);
         }
     };
 
     return (
         <View style={styles.container}>
-            <Text style={styles.header}>Edit Profile</Text>
+            <Text style={styles.title}>Your Profile</Text>
+            
             <TouchableOpacity onPress={async () => {
                 let res = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1] });
                 if (!res.canceled) setImage(res.assets[0].uri);
             }}>
-                <Image source={{ uri: image || 'https://via.placeholder.com/150' }} style={styles.img} />
-                <Text style={styles.link}>Change Photo</Text>
+                <Image source={{ uri: image || 'https://via.placeholder.com/150' }} style={styles.avatar} />
+                <Text style={styles.changeBtn}>Change Photo</Text>
             </TouchableOpacity>
-            
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your Name" />
-            
-            <TouchableOpacity style={styles.btn} onPress={handleSave}>
-                <Text style={styles.btnText}>Save Profile</Text>
+
+            <TextInput 
+                style={styles.input} 
+                value={name} 
+                onChangeText={setName} 
+                placeholder="Full Name" 
+            />
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={uploading}>
+                {uploading ? <ActivityIndicator color="white" /> : <Text style={styles.saveBtnText}>Save Online</Text>}
             </TouchableOpacity>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, alignItems: 'center', backgroundColor: '#FFF' },
-    header: { fontSize: 22, fontFamily: 'Fredoka-Bold', marginVertical: 20 },
-    img: { width: 120, height: 120, borderRadius: 60 },
-    link: { color: '#FF741C', marginTop: 10, fontFamily: 'Fredoka-SemiBold' },
-    input: { width: width - 40, borderBottomWidth: 1, borderColor: '#EEE', padding: 10, marginTop: 30, fontSize: 18 },
-    btn: { backgroundColor: '#FF741C', padding: 18, borderRadius: 15, width: width - 40, marginTop: 40, alignItems: 'center' },
-    btnText: { color: 'white', fontFamily: 'Fredoka-Bold' }
+    container: { flex: 1, backgroundColor: '#FFF', alignItems: 'center', padding: 30 },
+    title: { fontSize: 24, fontWeight: '700', marginVertical: 30 },
+    avatar: { width: 150, height: 150, borderRadius: 75, backgroundColor: '#F0F0F0' },
+    changeBtn: { color: '#FF741C', marginTop: 15, fontWeight: '600' },
+    input: { width: width - 60, borderBottomWidth: 1, borderColor: '#DDD', padding: 15, marginTop: 40, fontSize: 18 },
+    saveBtn: { backgroundColor: '#FF741C', width: width - 60, padding: 20, borderRadius: 15, marginTop: 50, alignItems: 'center' },
+    saveBtnText: { color: 'white', fontSize: 18, fontWeight: '700' }
 });
