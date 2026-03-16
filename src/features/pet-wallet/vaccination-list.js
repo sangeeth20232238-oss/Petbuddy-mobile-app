@@ -1,24 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, View, Text, TouchableOpacity, ScrollView, 
-  SafeAreaView, StatusBar, ActivityIndicator, Image, Platform 
+  SafeAreaView, StatusBar, ActivityIndicator, Image, Platform, Alert 
 } from 'react-native';
-import { ChevronLeft, Plus, ChevronRight, MessageSquare, FileText } from 'lucide-react-native';
+import { ChevronLeft, Plus, ChevronRight, MessageSquare, FileText, Trash2, Edit } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { COLORS } from '../src/theme/colors';
+import { COLORS } from '../../theme/colors';
 
 // --- FIREBASE IMPORTS ---
-import { db } from '../src/services/firebaseConfig';
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from '../../services/firebaseConfig';
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 
 /**
  * Reusable Component: RecordCard
  * Renders an entry in the list with an image thumbnail or a fallback icon.
  */
-const RecordCard = ({ title, date, imageUri, onPress }) => (
+const RecordCard = ({ title, date, imageUri, onPress, onDelete, onEdit, hasReport }) => (
   <TouchableOpacity style={styles.recordCard} onPress={onPress} activeOpacity={0.7}>
     <View style={styles.recordMain}>
-      {/* THUMBNAIL PREVIEW: Shows pet's vaccine document if it exists */}
       <View style={styles.attachmentPreview}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.thumbnail} />
@@ -32,18 +31,29 @@ const RecordCard = ({ title, date, imageUri, onPress }) => (
       <View style={styles.textContainer}>
         <Text style={styles.recordTitle}>{title}</Text>
         <Text style={styles.recordDate}>{date}</Text>
+        {hasReport && (
+          <View style={styles.reportBadge}>
+            <FileText size={12} color={COLORS.primary} />
+            <Text style={styles.reportText}>Report Available</Text>
+          </View>
+        )}
       </View>
     </View>
 
-    {/* Right-side circle with chevron icon */}
-    <View style={styles.arrowCircle}>
-      <ChevronRight size={20} color="#333" />
+    <View style={styles.actionButtons}>
+      <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+        <Edit size={16} color={COLORS.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
+        <Trash2 size={16} color="#FF4444" />
+      </TouchableOpacity>
     </View>
   </TouchableOpacity>
 );
 
-export default function VaccinationDetails() {
+export default function VaccinationList({ onBack, navigate, user }) {
   const router = useRouter(); 
+  const userId = user?.uid || 'default';
   
   // --- STATE MANAGEMENT ---
   const [vaccinations, setVaccinations] = useState([]); // List of vaccines from DB
@@ -55,8 +65,11 @@ export default function VaccinationDetails() {
    * Ensures the list updates immediately when a vaccine is added or edited.
    */
   useEffect(() => {
-    // Query: collection 'vaccinations' ordered by newest first
-    const q = query(collection(db, "vaccinations"), orderBy("createdAt", "desc"));
+    // Query: user-specific collection 'vaccinations' ordered by newest first
+    const q = query(
+      collection(db, "users", userId, "vaccinations"), 
+      orderBy("createdAt", "desc")
+    );
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const records = [];
@@ -74,22 +87,50 @@ export default function VaccinationDetails() {
     return () => unsubscribe();
   }, []);
 
-  /**
-   * HANDLER: handleRecordPress
-   * Navigates to details screen and passes the specific vaccine record.
-   */
+  const handleDelete = async (id) => {
+    Alert.alert(
+      'Delete Record',
+      'Are you sure you want to delete this vaccination record?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "users", userId, "vaccinations", id));
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete record');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEdit = (record) => {
+    if (!record || !record.id) {
+      Alert.alert('Error', 'Invalid record data');
+      return;
+    }
+    
+    navigate('edit-vaccination', { 
+      id: record.id,
+      vaccineName: record.vaccineName || '',
+      dateTaken: record.dateTaken || new Date().toLocaleDateString(),
+      nextDueDate: record.nextDueDate || new Date().toLocaleDateString(),
+      imageUri: record.imageUri || null
+    });
+  };
   const handleRecordPress = (record) => {
-    router.push({
-      pathname: '/record-details',
-      params: { 
-        id: record.id, 
-        type: 'vaccinations',
-        title: record.vaccineName, 
-        date: record.dateTaken,
-        pet: record.petName,
-        dueDate: record.nextDueDate,
-        image: record.imageUri 
-      }
+    navigate('record-details', { 
+      id: record.id, 
+      type: 'vaccinations',
+      title: record.vaccineName, 
+      date: record.dateTaken,
+      pet: record.petName,
+      dueDate: record.nextDueDate,
+      image: record.imageUri 
     });
   };
 
@@ -105,14 +146,14 @@ export default function VaccinationDetails() {
           <View style={styles.headerRow}>
             {/* Back Button with hitSlop for easier clicking on small icons */}
             <TouchableOpacity 
-              onPress={() => router.back()} 
+              onPress={onBack} 
               style={styles.backButton}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
             >
               <ChevronLeft color="#333" size={24} />
             </TouchableOpacity>
             
-            <Text style={styles.headerTitle}>Vaccination Details</Text>
+            <Text style={styles.headerTitle}>Vaccination List</Text>
             
             {/* Spacer to balance the Flexbox header layout */}
             <View style={{ width: 40 }} /> 
@@ -124,13 +165,13 @@ export default function VaccinationDetails() {
         {/* ACTION BUTTON: Add New Record */}
         <TouchableOpacity 
           style={styles.addButton}
-          onPress={() => router.push('/add-vaccination')}
+          onPress={() => navigate('add-vaccination')}
         >
           <Plus color="white" size={24} style={{ marginRight: 10 }} />
           <Text style={styles.addButtonText}>Add New Vaccination</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Existing Record</Text>
+        <Text style={styles.sectionTitle}>Existing Records</Text>
 
         {/* LIST RENDERING */}
         {loading ? (
@@ -144,7 +185,10 @@ export default function VaccinationDetails() {
               title={item.vaccineName} 
               date={item.dateTaken} 
               imageUri={item.imageUri} 
-              onPress={() => handleRecordPress(item)} 
+              hasReport={!!item.imageUri}
+              onPress={() => handleRecordPress(item)}
+              onDelete={() => handleDelete(item.id)}
+              onEdit={() => handleEdit(item)}
             />
           ))
         )}
@@ -223,9 +267,10 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginBottom: 15,
     elevation: 3,
+    minHeight: 80
   },
 
-  recordMain: { flexDirection: 'row', alignItems: 'center' },
+  recordMain: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 },
   
   attachmentPreview: {
     width: 50,
@@ -241,19 +286,61 @@ const styles = StyleSheet.create({
   thumbnail: { width: '100%', height: '100%', resizeMode: 'cover' },
   placeholderIcon: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   
-  textContainer: { justifyContent: 'center' },
+  textContainer: { justifyContent: 'center', flex: 1, marginRight: 10 },
   recordTitle: { fontSize: 17, fontWeight: '600', color: '#333' },
   recordDate: { fontSize: 13, color: '#888', marginTop: 3 },
+  reportBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF0E6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginTop: 5,
+    alignSelf: 'flex-start'
+  },
+  reportText: {
+    fontSize: 10,
+    color: COLORS.primary,
+    marginLeft: 4,
+    fontWeight: '500'
+  },
   emptyText: { textAlign: 'center', color: '#999', marginTop: 40, fontSize: 16 },
   
-  arrowCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EEE',
+  actionButtons: { 
+    flexDirection: 'row', 
+    gap: 8,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 80
+  },
+  editButton: {
+    backgroundColor: '#FFF0E6',
+    padding: 8,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  deleteButton: {
+    backgroundColor: '#FFE6E6',
+    padding: 8,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
 
   fabContainer: {

@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 // New configuration for project: petbuddy-138
@@ -19,6 +20,9 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 // 2. Initialize Firestore Database
 const db = getFirestore(app);
 
+// 3. Initialize Authentication
+const auth = getAuth(app);
+
 // 3. Safe Analytics (prevents errors during server-side rendering or non-browser environments)
 let analytics;
 if (typeof window !== "undefined") {
@@ -27,4 +31,4 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { db, analytics };
+export { db, auth, analytics };

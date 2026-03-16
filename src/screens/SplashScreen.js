@@ -8,10 +8,10 @@ export default function SplashScreen({ navigation }) {
   useEffect(() => {
     // Automatically move to Onboarding after 3 seconds
     const timer = setTimeout(() => {
-      navigation.replace('Onboarding'); 
+      navigation.navigate('Onboarding'); 
     }, 3000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [navigation]);
 
   return (
     <View style={styles.container}>
