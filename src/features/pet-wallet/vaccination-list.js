@@ -4,7 +4,6 @@ import {
   SafeAreaView, StatusBar, ActivityIndicator, Image, Platform, Alert 
 } from 'react-native';
 import { ChevronLeft, Plus, ChevronRight, MessageSquare, FileText, Trash2, Edit } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
 import { COLORS } from '../../theme/colors';
 
 // --- FIREBASE IMPORTS ---
@@ -51,9 +50,8 @@ const RecordCard = ({ title, date, imageUri, onPress, onDelete, onEdit, hasRepor
   </TouchableOpacity>
 );
 
-export default function VaccinationList({ onBack, navigate, user }) {
-  const router = useRouter(); 
-  const userId = user?.uid || 'default';
+export default function VaccinationList({ onBack, navigate }) {
+  const userId = 'default'; // Using default user for now
   
   // --- STATE MANAGEMENT ---
   const [vaccinations, setVaccinations] = useState([]); // List of vaccines from DB
@@ -114,7 +112,7 @@ export default function VaccinationList({ onBack, navigate, user }) {
       return;
     }
     
-    navigate('edit-vaccination', { 
+    navigate('editVaccination', { 
       id: record.id,
       vaccineName: record.vaccineName || '',
       dateTaken: record.dateTaken || new Date().toLocaleDateString(),
@@ -123,14 +121,15 @@ export default function VaccinationList({ onBack, navigate, user }) {
     });
   };
   const handleRecordPress = (record) => {
-    navigate('record-details', { 
+    navigate('recordDetails', { 
       id: record.id, 
       type: 'vaccinations',
       title: record.vaccineName, 
       date: record.dateTaken,
       pet: record.petName,
       dueDate: record.nextDueDate,
-      image: record.imageUri 
+      image: record.imageUri,
+      from: 'vaccinations'
     });
   };
 
@@ -165,7 +164,7 @@ export default function VaccinationList({ onBack, navigate, user }) {
         {/* ACTION BUTTON: Add New Record */}
         <TouchableOpacity 
           style={styles.addButton}
-          onPress={() => navigate('add-vaccination')}
+          onPress={() => navigate('addVaccination')}
         >
           <Plus color="white" size={24} style={{ marginRight: 10 }} />
           <Text style={styles.addButtonText}>Add New Vaccination</Text>
