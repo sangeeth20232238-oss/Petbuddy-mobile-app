@@ -74,4 +74,4 @@ export default function App() {
     </NavigationContainer>
   );
 }
-registerRootComponent(App);
+registerRootComponent(App); 

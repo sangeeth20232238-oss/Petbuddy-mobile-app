@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { auth, db, storage } from '../../../firebaseConfig'; 
+import * as FileSystem from 'expo-file-system/legacy';
+import { auth, db } from '../../../firebaseConfig'; 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -26,23 +26,6 @@ export default function EditProfileScreen({ navigation }) {
         }
     }, []);
 
-    // Helper to convert URI to Blob for Firebase Storage
-    const uploadImageAsync = async (uri) => {
-        const blob = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.onload = function () { resolve(xhr.response); };
-            xhr.onerror = function (e) { reject(new TypeError("Network request failed")); };
-            xhr.responseType = "blob";
-            xhr.open("GET", uri, true);
-            xhr.send(null);
-        });
-
-        const fileRef = ref(storage, `profiles/${user.uid}`);
-        await uploadBytes(fileRef, blob);
-        blob.close(); // Important for memory management
-        return await getDownloadURL(fileRef);
-    };
-
     const handleSave = async () => {
         if (!name) return Alert.alert("Error", "Name is required.");
         setUploading(true);
@@ -50,9 +33,10 @@ export default function EditProfileScreen({ navigation }) {
         try {
             let finalImageUrl = image;
 
-            // Only upload if it's a new local URI (starts with 'file' or 'content')
-            if (image && !image.startsWith('http')) {
-                finalImageUrl = await uploadImageAsync(image);
+            // Convert local image to base64 and store in Firestore
+            if (image && !image.startsWith('http') && !image.startsWith('data:')) {
+                const base64 = await FileSystem.readAsStringAsync(image, { encoding: FileSystem.EncodingType.Base64 });
+                finalImageUrl = `data:image/jpeg;base64,${base64}`;
             }
 
             await setDoc(doc(db, "users", user.uid), {
